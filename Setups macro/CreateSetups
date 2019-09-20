@@ -1,0 +1,253 @@
+Dim stpdb As Variant, stplist As Variant, oFile As Variant, fso As Variant
+
+
+Sub CreateStp()
+
+
+Set stpdb = Worksheets("Setups DB")
+Set stplist = Worksheets("Setups list")
+
+Set fso = CreateObject("Scripting.FileSystemObject")
+Dim oFile As Object
+name = stplist.Cells(1, 5).text
+For i = 2 To stplist.UsedRange.Rows.Count
+
+    If stplist.Cells(i, 2).text = "x" Then
+        writeFile CInt(i), CStr(name)
+    End If
+Next i
+
+End Sub
+
+Sub writeFile(i As Integer, name As String)
+    stpname = name + stplist.Cells(i, 1).Value + ".stp"
+    Set oFile = fso.CreateTextFile(stpname, 2)
+    fillheader (i)
+    Dim counter As Integer, num As Integer
+    counter = 0
+    num = 0
+    fillstp i, num, counter
+    If stplist.Cells(i, 3).text = "x" Then
+        fillnpf (num)
+        counter = counter + 2
+    End If
+    
+    fillfooter (counter)
+    
+    oFile.Close
+    
+End Sub
+Sub fillheader(i As Integer)
+    oFile.writeLine "Machine Name: MCP"
+    oFile.writeLine ""
+    text = "Program Name: " + stplist.Cells(i, 1).Value
+    oFile.writeLine text
+    oFile.writeLine ""
+    text = "Date:         " + Datecalc()
+    oFile.writeLine text
+    oFile.writeLine ""
+    oFile.writeLine ""
+    oFile.writeLine "Feeder   Type          Part Number          Count   Reference                  Description"
+    oFile.writeLine "---------------------------------------------------------------------------------------------------------"
+
+End Sub
+
+Function Datecalc()
+d = Date
+m = Month(Date)
+If m < 10 Then
+m = "0" & m
+End If
+text = m & "/"
+m = Day(Date)
+If m < 10 Then
+m = "0" & m
+End If
+text = text & Day(Date) & "/" & Year(Date)
+
+t = Time
+
+h = Hour(Time)
+x = " AM"
+If h > 12 Then
+h = h - 12
+x = " PM"
+End If
+m = Minute(Time)
+If m < 10 Then
+m = "0" & m
+End If
+s = Second(Time)
+If s < 10 Then
+s = "0" & s
+End If
+text = text & " " & h & ":" & m & ":" & s & x
+Datecalc = text
+
+End Function
+
+Sub fillstp(i As Integer, num As Integer, counter As Integer)
+    Dim nund As Integer
+    If stplist.Cells(i, 4).text = "x" Then
+    separateflag = True
+    End If
+    
+    hund = 0
+    For j = 2 To stpdb.UsedRange.Rows.Count
+        If stpdb.Cells(j, 1).Value = stplist.Cells(i, 1).Value Then
+            If stpdb.Cells(j, 3).text <> "" Then
+                If stpdb.Cells(j, 6) <> "" Then
+                    If stpdb.Cells(j, 6) <> 0 Then
+                        counter = counter + stpdb.Cells(j, 5).Value
+                        num = num + 1
+                        If (stpdb.Cells(j, 6).text <> "") Then
+                            hund = stpdb.Cells(j, 6).Value
+                        Else
+                            hund = 0
+                        End If
+                        writecomp num, hund, j
+                    End If
+                End If
+                
+            End If
+        End If
+    Next j
+    
+    
+End Sub
+
+Sub writecomp(num As Integer, hund As Variant, j As Variant)
+
+    pn = stpdb.Cells(j, 2).Value
+    Count = stpdb.Cells(j, 5).Value
+    
+    numt = generatenumt(num, hund)
+    crd = stpdb.Cells(j, 3)
+    Do While (Len(crd) > 25)
+        If Len(crd) > 25 Then
+            temp = StrReverse(Left(crd, 26))
+            x = InStr(1, temp, " ", vbTextCompare) - 1
+            temp1 = temp1 + StrReverse(Right(temp, 26 - x))
+            For i = 1 To x
+                temp1 = temp1 + " "
+            Next i
+            crd = Right(crd, Len(crd) - 26 + x)
+        End If
+    Loop
+    temp1 = temp1 + crd
+    crd = temp1
+        
+        
+        
+    
+    desc = stpdb.Cells(j, 4)
+    crdl = Len(crd)
+    descl = Len(desc)
+    Max = 0
+    Max = getmaxstrcount(CInt(crdl), CInt(descl))
+    If Max = 1 Then
+        text = createline(numt, pn, Count, crd, desc)
+        oFile.writeLine (text)
+    Else
+        text = createline(numt, pn, Count, Left(crd, 26), Left(desc, 26))
+        oFile.writeLine (text)
+        For x = 2 To Max
+            If Len(crd) > 26 Then
+                crd = Right(crd, Len(crd) - 26)
+            Else
+                crd = ""
+            End If
+            If Len(desc) > 26 Then
+                desc = Right(desc, Len(desc) - 26)
+            Else
+                desc = ""
+            End If
+            text = addspaces("", 52)
+            text = text + Left(crd, 26)
+            text = addspaces(text, 28 - Len(Left(crd, 26)))
+            text = text + Left(desc, 26)
+            oFile.writeLine (text)
+        Next x
+    End If
+ 
+End Sub
+
+Sub fillfooter(counter As Integer)
+
+    oFile.writeLine ""
+    oFile.writeLine ""
+    text = "Total"
+        If (counter < 10) Then
+            text = addspaces(text, 43)
+        Else
+            If (counter < 100) Then
+                text = addspaces(text, 42)
+            Else
+                text = addspaces(text, 41)
+            End If
+        End If
+        text = text & counter
+        oFile.writeLine text
+
+End Sub
+Function getmaxstrcount(crdl As Integer, descl As Integer)
+If crdl > descl Then
+    temp = crdl \ 26
+Else
+    temp = descl \ 26
+End If
+    getmaxstrcount = temp + 1
+End Function
+Function createline(num As Variant, pn As Variant, Count As Variant, ref As Variant, desc As Variant)
+Dim n As Integer
+Dim text As String
+    text = num
+    text = text + "                    "
+    text = text + pn
+    x = Len(pn)
+    
+    n = 26 - x - Len(Count)
+    text = addspaces(text, n)
+    text = text & CStr(Count) + "   "
+    text = text + ref
+    n = 27 - Len(ref)
+    text = addspaces(text, n)
+    text = text + desc
+    createline = text
+    
+End Function
+
+Function addspaces(text As Variant, n As Integer)
+    For i = 1 To n
+        text = text + " "
+    Next i
+    addspaces = text
+End Function
+
+Function generatenumt(num As Integer, hund As Variant)
+Dim numm As String
+
+    If (num < 10) Then
+        numm = hund & "0" & num
+    Else
+        If (num < 100) Then
+            numm = hund & num
+        Else
+            numm = num
+        End If
+    End If
+    
+    generatenumt = numm
+End Function
+
+Sub fillnpf(num As Integer)
+    
+    num = num + 1
+    text = generatenumt(num, 0)
+    text = text + "                    NPF                      1   NPF                        NOT PROBLEM FOUND"
+    oFile.writeLine (text)
+    num = num + 1
+    text = generatenumt(num, 0)
+    text = text + "                    NOCRD                    1   NOCRD                      NOCRD"
+    oFile.writeLine (text)
+End Sub
